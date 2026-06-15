@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PRINCIPAL
+  TEACHER
+  STUDENT
+  STAFF
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+}
+
+enum ChannelType {
+  STAFF
+  TEACHERS
+  DIRECT
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  users     User[]
+  classes   Class[]
+  tasks     Task[]
+  channels  Channel[]
+}
+
+model User {
+  id             String          @id @default(cuid())
+  username       String
+  password       String
+  name           String
+  role           Role
+  schoolId       String
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId        String?
+  class          Class?          @relation("ClassStudents", fields: [classId], references: [id])
+  teacherClasses TeacherClass[]
+  createdTasks   Task[]          @relation("TaskCreator")
+  assignedTasks  Task[]          @relation("TaskAssignee")
+  channelMemberships ChannelMember[]
+  messages       Message[]
+  createdAt      DateTime        @default(now())
+
+  @@unique([schoolId, username])
+  @@index([schoolId])
+}
+
+model Class {
+  id             String         @id @default(cuid())
+  name           String
+  schoolId       String
+  school         School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students       User[]         @relation("ClassStudents")
+  teacherClasses TeacherClass[]
+  tasks          Task[]
+
+  @@unique([schoolId, name])
+}
+
+model TeacherClass {
+  teacherId String
+  classId   String
+  teacher   User  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class     Class @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, classId])
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  title        String
+  description  String     @default("")
+  dueDate      DateTime?
+  status       TaskStatus @default(PENDING)
+  schoolId     String
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId      String?
+  class        Class?     @relation(fields: [classId], references: [id])
+  createdById  String
+  createdBy    User       @relation("TaskCreator", fields: [createdById], references: [id])
+  assignedToId String?
+  assignedTo   User?      @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+model Channel {
+  id        String          @id @default(cuid())
+  type      ChannelType
+  name      String?
+  schoolId  String
+  school    School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  members   ChannelMember[]
+  messages  Message[]
+  createdAt DateTime        @default(now())
+}
+
+model ChannelMember {
+  channelId String
+  userId    String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
